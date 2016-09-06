@@ -103,6 +103,8 @@ fn main() {
 				println!("{} says: {}", message.author.name, message.content);
 				if message.content == "!test" {
 					let _ = discord.send_message(&message.channel_id, "This is a reply to the test.", "", false);
+				} else if message.content == "!code" {
+					let _ = discord.send_message(&message.channel_id, "You can find my internals at https://github.com/TorstenCScholz/fs-bot", "", false);
 				} else if message.content == "!quit" {
 					println!("Quitting.");
 					let text = "Bye ".to_string() + &message.author.name + ".";
