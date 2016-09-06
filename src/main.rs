@@ -31,6 +31,7 @@ fn say_hello(discord: &Discord, user_id: &UserId, status_channel_id: &ChannelId,
 	send_to_channel(discord, server_id, status_channel_id, user_id, " joined.");
 
 	let mut rng = rand::thread_rng();
+	// TODO: find number of "helloX.wav" files dynamically
 	let index = rng.gen_range(0, 7).to_string(); // 7 = Number of hello files
 
 	play_sound(&format!("{}{}", "hello", index), connection, server_id);
@@ -85,9 +86,9 @@ fn main() {
 	let (mut connection, _) = discord.connect().expect("connect failed");
 	println!("Ready.");
 
-	let server_id = ServerId(u64::from_str(&env::var("FSB_SERVER_ID").expect("Cannot find server id")).expect("Id is not a number")); // Modi Server
-	let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number")); // Frostshock Channel
-	let status_channel_id = ChannelId(u64::from_str(&env::var("FSB_STATUS_CHANNEL_ID").expect("Cannot find status channel id")).expect("Id is not a number")); // Status Channel
+	let server_id = ServerId(u64::from_str(&env::var("FSB_SERVER_ID").expect("Cannot find server id")).expect("Id is not a number"));
+	let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number"));
+	let status_channel_id = ChannelId(u64::from_str(&env::var("FSB_STATUS_CHANNEL_ID").expect("Cannot find status channel id")).expect("Id is not a number"));
 
 	let my_id = UserId(u64::from_str(&env::var("FSB_MY_ID").expect("Cannot find bot id")).expect("Id is not a number"));
 
@@ -140,21 +141,6 @@ fn main() {
 				}
 
 				println!("[Users after voice update] {:?}", voice_users);
-
-				// if let Some(cur_channel) = connection.voice(server_id).current_channel() {
-				// 	match server_id {
-				// 		Some(server_id) => if let Some(srv) = state.servers().iter().find(|srv| srv.id == server_id) {
-				// 			if srv.voice_states.iter().filter(|vs| vs.channel_id == Some(cur_channel)).count() <= 1 {
-				// 				connection.voice(Some(server_id)).disconnect();
-				// 			}
-				// 		},
-				// 		None => if let Some(call) = state.calls().get(&cur_channel) {
-				// 			if call.voice_states.len() <= 1 {
-				// 				connection.voice(server_id).disconnect();
-				// 			}
-				// 		}
-				// 	}
-				// }
 			}
 			Ok(_) => {}
 			Err(discord::Error::Closed(code, body)) => {
