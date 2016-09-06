@@ -1,0 +1,10 @@
+[package]
+name = "fs-bot-rs"
+version = "0.1.0"
+authors = ["tscho"]
+
+[dependencies]
+discord = "0.6.0"
+hound = "2.0.0"
+chrono = "0.2"
+rand = "0.3.14"
