@@ -80,7 +80,7 @@ fn sync_voice_user_state(has_synced: &mut bool, voice_users: &mut HashSet<UserId
 	if !*has_synced {
 		for server in state.servers() {
 			if server.id == server_id {
-				// TODO: Why do I have to clone here?
+				// TODO: Why do I have to clone here? (otherwise: cannot move out of borrowed content [E0507])
 				for voice_state in server.clone().voice_states {
 					if voice_state.channel_id.unwrap() == voice_channel_id {
 						let member = discord.get_member(server_id, voice_state.user_id).unwrap();
@@ -181,9 +181,12 @@ fn main() {
 						say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
 					}
 				} else {
-					voice_users.remove(&user_id);
+					// Only say goodbye if the user was prev. known to us (that is he/she was in our observed voice channel)
+					if voice_users.contains(&user_id) {
+						voice_users.remove(&user_id);
 
-					say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+						say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+					}
 				}
 
 				println!("[Users after voice update] {:?}", voice_users);
