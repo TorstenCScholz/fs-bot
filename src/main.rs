@@ -171,14 +171,18 @@ fn main() {
 				if let Some(channel_id) = voice_state.channel_id {
 					if channel_id == voice_channel_id {
 						if !voice_users.contains(&user_id) {
+							// User joined
 							voice_users.insert(user_id);
 
 							say_hello(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
 						}
 					} else {
-						voice_users.remove(&user_id);
+						if voice_users.contains(&user_id) {
+							// User in observed voice channel left
+							voice_users.remove(&user_id);
 
-						say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+							say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+						}
 					}
 				} else {
 					// Only say goodbye if the user was prev. known to us (that is he/she was in our observed voice channel)
