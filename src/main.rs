@@ -15,6 +15,10 @@ use std::collections::{HashSet};
 use std::{thread, time, env};
 use std::str::{FromStr};
 
+mod command;
+
+use command::Command;
+
 fn send_to_channel(discord: &Discord, server_id: &ServerId, channel_id: &ChannelId, user_id: &UserId, message_postfix: &str) {
 	let now = Local::now();
 
@@ -52,6 +56,8 @@ fn play_sound(command: &str, connection: &mut Connection, server_id: &ServerId) 
 
 		let voice_handle = connection.voice(*server_id);
 		voice_handle.play(source);
+	} else {
+		println!("Trying to play invalid sound: {}", command);
 	}
 }
 
@@ -83,8 +89,8 @@ fn sync_voice_user_state(has_synced: &mut bool, voice_users: &mut HashSet<UserId
 				// TODO: Why do I have to clone here? (otherwise: cannot move out of borrowed content [E0507])
 				for voice_state in server.clone().voice_states {
 					if voice_state.channel_id.unwrap() == voice_channel_id {
-						let member = discord.get_member(server_id, voice_state.user_id).unwrap();
-						println!("User is in voice channel: {}", member.user.name);
+						//let member = discord.get_member(server_id, voice_state.user_id).unwrap();
+						//println!("User is in voice channel: {}", member.user.name);
 
 						voice_users.insert(voice_state.user_id);
 					}
@@ -118,6 +124,17 @@ fn main() {
 		voice_handle.connect(voice_channel_id);
 	}
 
+	let play_callback = |mut connection: &mut Connection, server_id: &ServerId, args: &[&str]| {
+		if args.len() < 1 {
+			return;
+		}
+
+		play_sound(args[0], &mut connection, &server_id);
+	};
+
+	let mut commands: HashSet<Command> = HashSet::new();
+	commands.insert(Command::new("play", Box::new(play_callback)));
+
 	let mut has_synced = false;
 
 	loop {
@@ -145,6 +162,26 @@ fn main() {
 		match event {
 			Event::MessageCreate(message) => {
 				println!("{} says: {}", message.author.name, message.content);
+				if message.content.starts_with("!") && message.content.len() > 1 {
+					let content_sans_action = &message.content[1..];
+					let split_contents: Vec<&str> = content_sans_action.split(" ").collect();
+					let command_name = &split_contents[0];
+
+					let mut parameters: &[&str] = &[];
+
+					if split_contents.len() > 1 {
+						parameters = &split_contents[1..];
+					}
+
+					for command in &commands {
+						if command.matches(command_name) {
+							command.invoke(&mut connection, &server_id, parameters);
+						} else {
+							println!("[Info] Unknown command: {}", command_name);
+						}
+					}
+				}
+
 				if message.content == "!test" {
 					let _ = discord.send_message(&message.channel_id, "This is a reply to the test.", "", false);
 				} else if message.content == "!code" {
