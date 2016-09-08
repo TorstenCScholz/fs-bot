@@ -3,7 +3,7 @@ extern crate hound;
 extern crate chrono;
 extern crate rand;
 
-use discord::{Discord, Connection};
+use discord::{Discord, Connection, State};
 use discord::model::{Event, ChannelId, ServerId, UserId};
 use discord::voice::{AudioSource};
 
@@ -76,6 +76,26 @@ impl AudioSource for PcmSource {
 	}
 }
 
+fn sync_voice_user_state(has_synced: &mut bool, voice_users: &mut HashSet<UserId>, discord: &Discord, state: &State, server_id: ServerId, voice_channel_id: ChannelId) {
+	if !*has_synced {
+		for server in state.servers() {
+			if server.id == server_id {
+				// TODO: Why do I have to clone here?
+				for voice_state in server.clone().voice_states {
+					if voice_state.channel_id.unwrap() == voice_channel_id {
+						let member = discord.get_member(server_id, voice_state.user_id).unwrap();
+						println!("User is in voice channel: {}", member.user.name);
+
+						voice_users.insert(voice_state.user_id);
+					}
+				}
+
+				*has_synced = true;
+			}
+		}
+	}
+}
+
 fn main() {
 	let mut voice_users: HashSet<UserId> = HashSet::new();
 
@@ -83,7 +103,8 @@ fn main() {
 	let discord = Discord::from_bot_token(&env::var("FSB_DISCORD_TOKEN").expect("Cannot find bot token.")).expect("login failed");
 
 	// Establish and use a websocket connection
-	let (mut connection, _) = discord.connect().expect("connect failed");
+	let (mut connection, ready) = discord.connect().expect("connect failed");
+	let mut state = State::new(ready);
 	println!("Ready.");
 
 	let server_id = ServerId(u64::from_str(&env::var("FSB_SERVER_ID").expect("Cannot find server id")).expect("Id is not a number"));
@@ -97,9 +118,32 @@ fn main() {
 		voice_handle.connect(voice_channel_id);
 	}
 
+	let mut has_synced = false;
+
 	loop {
-		match connection.recv_event() {
-			Ok(Event::MessageCreate(message)) => {
+		let event = match connection.recv_event() {
+			Ok(event) => event,
+			Err(err) => {
+				println!("[Warning] Receive error: {:?}", err);
+				if let discord::Error::WebSocket(..) = err {
+					// Handle the websocket connection being dropped
+					let (new_connection, ready) = discord.connect().expect("connect failed");
+					connection = new_connection;
+					state = State::new(ready);
+					println!("[Ready] Reconnected successfully.");
+				}
+				if let discord::Error::Closed(..) = err {
+					break
+				}
+				continue
+			},
+		};
+		state.update(&event);
+
+		sync_voice_user_state(&mut has_synced, &mut voice_users, &discord, &state, server_id, voice_channel_id);
+
+		match event {
+			Event::MessageCreate(message) => {
 				println!("{} says: {}", message.author.name, message.content);
 				if message.content == "!test" {
 					let _ = discord.send_message(&message.channel_id, "This is a reply to the test.", "", false);
@@ -115,7 +159,7 @@ fn main() {
 					play_sound(command_name, &mut connection, &server_id);
 				}
 			}
-			Ok(Event::VoiceStateUpdate(server_id, voice_state)) => {
+			Event::VoiceStateUpdate(server_id, voice_state) => {
 				println!("[Voice update] {:?}", voice_state);
 
 				let user_id = voice_state.user_id;
@@ -144,15 +188,10 @@ fn main() {
 
 				println!("[Users after voice update] {:?}", voice_users);
 			}
-			Ok(_) => {}
-			Err(discord::Error::Closed(code, body)) => {
-				println!("Gateway closed on us with code {:?}: {:?}", code, body);
-				break
-			}
-			Err(err) => println!("Receive error: {:?}", err)
+			_ => {}
 		}
 	}
 
 	// Log out from the API
-	discord.logout().expect("logout failed"); // Does not work with bots?! (error: Status(Unauthorized, Some({"code":0,"message":"401: Unauthorized"})))
+	connection.shutdown().expect("closing websocket failed");
 }
