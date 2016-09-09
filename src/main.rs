@@ -154,6 +154,12 @@ fn main() {
 					let text = "Bye ".to_string() + &message.author.name + ".";
 					let _ = discord.send_message(&message.channel_id, &text, "", false);
 					break;
+				} else if message.content == "!joinvoice" {
+					let voice_handle = connection.voice(server_id);
+					voice_handle.connect(voice_channel_id);
+				} else if message.content == "!leavevoice" {
+					let voice_handle = connection.voice(server_id);
+					voice_handle.disconnect();
 				} else if message.content.starts_with("!") {
 					let command_name: &str = &message.content[1..];
 					play_sound(command_name, &mut connection, &server_id);
