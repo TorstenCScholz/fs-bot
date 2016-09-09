@@ -83,9 +83,6 @@ fn sync_voice_user_state(has_synced: &mut bool, voice_users: &mut HashSet<UserId
 				// TODO: Why do I have to clone here? (otherwise: cannot move out of borrowed content [E0507])
 				for voice_state in server.clone().voice_states {
 					if voice_state.channel_id.unwrap() == voice_channel_id {
-						let member = discord.get_member(server_id, voice_state.user_id).unwrap();
-						println!("User is in voice channel: {}", member.user.name);
-
 						voice_users.insert(voice_state.user_id);
 					}
 				}
@@ -154,6 +151,12 @@ fn main() {
 					let text = "Bye ".to_string() + &message.author.name + ".";
 					let _ = discord.send_message(&message.channel_id, &text, "", false);
 					break;
+				} else if message.content == "!joinvoice" {
+					let voice_handle = connection.voice(server_id);
+					voice_handle.connect(voice_channel_id);
+				} else if message.content == "!leavevoice" {
+					let voice_handle = connection.voice(server_id);
+					voice_handle.disconnect();
 				} else if message.content.starts_with("!") {
 					let command_name: &str = &message.content[1..];
 					play_sound(command_name, &mut connection, &server_id);
