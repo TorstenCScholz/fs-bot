@@ -132,6 +132,11 @@ fn main() {
 				if let discord::Error::Closed(..) = err {
 					break
 				}
+
+				// TODO: If we left the voice channel, simply rejoin it
+				let voice_handle = connection.voice(server_id);
+				voice_handle.connect(voice_channel_id);
+
 				continue
 			},
 		};
