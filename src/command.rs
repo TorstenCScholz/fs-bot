@@ -22,6 +22,7 @@ impl <'a> Command<'a> {
     }
 
     pub fn invoke(&self, connection: &mut Connection, server_id: &ServerId, parameters: &[&str]) {
+        println!("[Info] Invoking command {} with parameters {:?}.", self.get_name(), parameters);
         (self.callback)(connection, server_id, parameters);
     }
 

@@ -132,8 +132,25 @@ fn main() {
 		play_sound(args[0], &mut connection, &server_id);
 	};
 
+	let voice_join_callback = |mut connection: &mut Connection, server_id: &ServerId, args: &[&str]| {
+		if args.len() < 1 {
+			return;
+		}
+
+		// TODO: Inject voice_channel_id via Context or something like that
+		let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number"));
+		let voice_handle = connection.voice(*server_id);
+
+		if args[0] == "join" {
+			voice_handle.connect(voice_channel_id);
+		} else if args[0] == "leave" {
+			voice_handle.disconnect();
+		}
+	};
+
 	let mut commands: HashSet<Command> = HashSet::new();
 	commands.insert(Command::new("play", Box::new(play_callback)));
+	commands.insert(Command::new("voice", Box::new(voice_join_callback)));
 
 	let mut has_synced = false;
 
@@ -173,37 +190,32 @@ fn main() {
 						parameters = &split_contents[1..];
 					}
 
+					let mut has_invoked_cmd = false;
 					for command in &commands {
 						if command.matches(command_name) {
 							command.invoke(&mut connection, &server_id, parameters);
-						} else {
-							println!("[Info] Unknown command: {}", command_name);
+							has_invoked_cmd = true;
 						}
+					}
+
+					if !has_invoked_cmd {
+						println!("[Info] Unknown command: {}", command_name);
 					}
 				}
 
-				if message.content == "!test" {
-					let _ = discord.send_message(&message.channel_id, "This is a reply to the test.", "", false);
-				} else if message.content == "!code" {
+				if message.content == "!code" {
 					let _ = discord.send_message(&message.channel_id, "You can find my internals at https://github.com/TorstenCScholz/fs-bot", "", false);
 				} else if message.content == "!quit" {
 					println!("Quitting.");
 					let text = "Bye ".to_string() + &message.author.name + ".";
 					let _ = discord.send_message(&message.channel_id, &text, "", false);
 					break;
-				} else if message.content.starts_with("!") {
-					let command_name: &str = &message.content[1..];
-					play_sound(command_name, &mut connection, &server_id);
 				}
 			}
 			Event::VoiceStateUpdate(server_id, voice_state) => {
 				println!("[Voice update] {:?}", voice_state);
 
 				let user_id = voice_state.user_id;
-
-				if my_id == user_id {
-					continue;
-				}
 
 				if let Some(channel_id) = voice_state.channel_id {
 					if channel_id == voice_channel_id {
@@ -215,18 +227,25 @@ fn main() {
 						}
 					} else {
 						if voice_users.contains(&user_id) {
-							// User in observed voice channel left
-							voice_users.remove(&user_id);
+							// User in observed voice channel switched voice channel
+							if user_id == my_id { // If it was us (maybe we got moved) just rejoin
+								let voice_handle = connection.voice(server_id);
+								voice_handle.connect(voice_channel_id);
+							} else {
+								voice_users.remove(&user_id);
 
-							say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+								say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+							}
 						}
 					}
 				} else {
 					// Only say goodbye if the user was prev. known to us (that is he/she was in our observed voice channel)
 					if voice_users.contains(&user_id) {
-						voice_users.remove(&user_id);
+						if user_id != my_id {
+							voice_users.remove(&user_id);
 
-						say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+							say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+						}
 					}
 				}
 
