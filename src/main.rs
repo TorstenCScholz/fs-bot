@@ -91,7 +91,6 @@ fn sync_voice_user_state(has_synced: &mut bool, voice_users: &mut HashSet<UserId
 					if voice_state.channel_id.unwrap() == voice_channel_id {
 						//let member = discord.get_member(server_id, voice_state.user_id).unwrap();
 						//println!("User is in voice channel: {}", member.user.name);
-
 						voice_users.insert(voice_state.user_id);
 					}
 				}
@@ -169,6 +168,11 @@ fn main() {
 				if let discord::Error::Closed(..) = err {
 					break
 				}
+
+				// TODO: If we left the voice channel, simply rejoin it
+				let voice_handle = connection.voice(server_id);
+				voice_handle.connect(voice_channel_id);
+
 				continue
 			},
 		};
