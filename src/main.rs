@@ -114,6 +114,7 @@ fn main() {
 	let server_id = ServerId(u64::from_str(&env::var("FSB_SERVER_ID").expect("Cannot find server id")).expect("Id is not a number"));
 	let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number"));
 	let status_channel_id = ChannelId(u64::from_str(&env::var("FSB_STATUS_CHANNEL_ID").expect("Cannot find status channel id")).expect("Id is not a number"));
+	let master_permission_id = UserId(u64::from_str(&env::var("FSB_MASTER_PERMISSION-ID").expect("Cannot find master permission id")).expect("Id is not a number"));
 
 	let my_id = UserId(u64::from_str(&env::var("FSB_MY_ID").expect("Cannot find bot id")).expect("Id is not a number"));
 
@@ -147,8 +148,8 @@ fn main() {
 	};
 
 	let mut commands: HashSet<Command> = HashSet::new();
-	commands.insert(Command::new("play", Box::new(play_callback)));
-	commands.insert(Command::new("voice", Box::new(voice_join_callback)));
+	commands.insert(Command::new_default("play", Box::new(play_callback)));
+	commands.insert(Command::new_default("voice", Box::new(voice_join_callback)));
 
 	let mut has_synced = false;
 
@@ -182,6 +183,8 @@ fn main() {
 		match event {
 			Event::MessageCreate(message) => {
 				println!("{} says: {}", message.author.name, message.content);
+				let user_id = message.author.id;
+
 				if message.content.starts_with("!") && message.content.len() > 1 {
 					let content_sans_action = &message.content[1..];
 					let split_contents: Vec<&str> = content_sans_action.split(" ").collect();
@@ -196,7 +199,7 @@ fn main() {
 					let mut has_invoked_cmd = false;
 					for command in &commands {
 						if command.matches(command_name) {
-							command.invoke(&mut connection, &server_id, parameters);
+							command.invoke(&mut connection, &server_id, &user_id, parameters);
 							has_invoked_cmd = true;
 						}
 					}
@@ -209,10 +212,12 @@ fn main() {
 				if message.content == "!code" {
 					let _ = discord.send_message(&message.channel_id, "You can find my internals at https://github.com/TorstenCScholz/fs-bot", "", false);
 				} else if message.content == "!quit" {
-					println!("Quitting.");
-					let text = "Bye ".to_string() + &message.author.name + ".";
-					let _ = discord.send_message(&message.channel_id, &text, "", false);
-					break;
+					if master_permission_id == user_id {
+						println!("Quitting.");
+						let text = "Bye ".to_string() + &message.author.name + ".";
+						let _ = discord.send_message(&message.channel_id, &text, "", false);
+						break;
+					}
 				}
 			}
 			Event::VoiceStateUpdate(server_id, voice_state) => {

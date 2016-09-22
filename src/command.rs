@@ -1,19 +1,25 @@
 use discord::{Connection};
-use discord::model::{ServerId};
+use discord::model::{ServerId, UserId};
 
 use std::cmp::{PartialEq, Eq};
 use std::hash::{Hash, Hasher};
 
 pub struct Command<'a> {
     name: &'a str,
-    callback: Box<Fn(&mut Connection, &ServerId, &[&str]) -> ()>
+    callback: Box<Fn(&mut Connection, &ServerId, &[&str]) -> ()>,
+    requires_permission: bool
 }
 
 impl <'a> Command<'a> {
-    pub fn new<'r>(name: &'r str, callback: Box<Fn(&mut Connection, &ServerId, &[&str]) -> ()>) -> Command<'r> {
+    pub fn new_default<'r>(name: &'r str, callback: Box<Fn(&mut Connection, &ServerId, &[&str]) -> ()>) -> Command<'r> {
+        Command::new(name, callback, false)
+    }
+
+    pub fn new<'r>(name: &'r str, callback: Box<Fn(&mut Connection, &ServerId, &[&str]) -> ()>, req_perm: bool) -> Command<'r> {
         Command {
             name: name,
-            callback: callback
+            callback: callback,
+            requires_permission: req_perm
         }
     }
 
@@ -21,9 +27,15 @@ impl <'a> Command<'a> {
         self.name
     }
 
-    pub fn invoke(&self, connection: &mut Connection, server_id: &ServerId, parameters: &[&str]) {
+    pub fn is_permission_required(&self) -> bool {
+        self.requires_permission
+    }
+
+    pub fn invoke(&self, connection: &mut Connection, server_id: &ServerId, user_id: &UserId, parameters: &[&str]) {
         println!("[Info] Invoking command {} with parameters {:?}.", self.get_name(), parameters);
-        (self.callback)(connection, server_id, parameters);
+        if !self.is_permission_required() {
+            (self.callback)(connection, server_id, parameters);
+        }
     }
 
     pub fn matches(&self, name: &str) -> bool {
