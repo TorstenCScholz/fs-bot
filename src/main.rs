@@ -114,7 +114,7 @@ fn main() {
 	let server_id = ServerId(u64::from_str(&env::var("FSB_SERVER_ID").expect("Cannot find server id")).expect("Id is not a number"));
 	let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number"));
 	let status_channel_id = ChannelId(u64::from_str(&env::var("FSB_STATUS_CHANNEL_ID").expect("Cannot find status channel id")).expect("Id is not a number"));
-	let master_permission_id = UserId(u64::from_str(&env::var("FSB_MASTER_PERMISSION-ID").expect("Cannot find master permission id")).expect("Id is not a number"));
+	let master_permission_id = UserId(u64::from_str(&env::var("FSB_MASTER_PERMISSION_ID").expect("Cannot find master permission id")).expect("Id is not a number"));
 
 	let my_id = UserId(u64::from_str(&env::var("FSB_MY_ID").expect("Cannot find bot id")).expect("Id is not a number"));
 
