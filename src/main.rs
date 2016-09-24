@@ -54,7 +54,7 @@ fn play_sound(command: &str, connection: &mut Connection, server_id: &ServerId) 
 		let samples: Vec<i16> = reader.samples().map(|s| s.unwrap()).collect();
 		let source = create_pcm_source(true, samples);
 
-		let voice_handle = connection.voice(*server_id);
+		let voice_handle = connection.voice(Some(*server_id));
 		voice_handle.play(source);
 	} else {
 		println!("Trying to play invalid sound: {}", command);
@@ -118,7 +118,7 @@ fn main() {
 	let my_id = UserId(u64::from_str(&env::var("FSB_MY_ID").expect("Cannot find bot id")).expect("Id is not a number"));
 
 	{
-		let voice_handle = connection.voice(server_id);
+		let voice_handle = connection.voice(Some(server_id));
 		voice_handle.connect(voice_channel_id);
 	}
 
@@ -137,7 +137,7 @@ fn main() {
 
 		// TODO: Inject voice_channel_id via Context or something like that
 		let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number"));
-		let voice_handle = connection.voice(*server_id);
+		let voice_handle = connection.voice(Some(*server_id));
 
 		if args[0] == "join" {
 			voice_handle.connect(voice_channel_id);
@@ -169,7 +169,7 @@ fn main() {
 				}
 
 				// TODO: If we left the voice channel, simply rejoin it
-				let voice_handle = connection.voice(server_id);
+				let voice_handle = connection.voice(Some(server_id));
 				voice_handle.connect(voice_channel_id);
 
 				continue
@@ -226,7 +226,7 @@ fn main() {
 							// User joined
 							voice_users.insert(user_id);
 
-							say_hello(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+							say_hello(&discord, &user_id, &status_channel_id, &mut connection, &server_id.unwrap());
 						}
 					} else {
 						if voice_users.contains(&user_id) {
@@ -237,7 +237,7 @@ fn main() {
 							} else {
 								voice_users.remove(&user_id);
 
-								say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+								say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id.unwrap());
 							}
 						}
 					}
@@ -247,7 +247,7 @@ fn main() {
 						if user_id != my_id {
 							voice_users.remove(&user_id);
 
-							say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id);
+							say_goodbye(&discord, &user_id, &status_channel_id, &mut connection, &server_id.unwrap());
 						}
 					}
 				}
