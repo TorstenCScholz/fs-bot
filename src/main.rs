@@ -171,6 +171,7 @@ fn main() {
 
 				// TODO: If we left the voice channel, simply rejoin it
 				let voice_handle = connection.voice(Some(server_id));
+				voice_handle.disconnect();
 				voice_handle.connect(voice_channel_id);
 
 				continue
