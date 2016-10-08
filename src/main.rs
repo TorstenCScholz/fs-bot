@@ -17,7 +17,7 @@ use std::str::{FromStr};
 
 mod command;
 
-use command::Command;
+use command::{Command, Context};
 
 fn send_to_channel(discord: &Discord, server_id: &ServerId, channel_id: &ChannelId, user_id: &UserId, message_postfix: &str) {
 	let now = Local::now();
@@ -123,24 +123,23 @@ fn main() {
 		voice_handle.connect(voice_channel_id);
 	}
 
-	let play_callback = |mut connection: &mut Connection, server_id: &ServerId, args: &[&str]| {
+	let play_callback = |context: &mut Context, args: &[&str]| {
 		if args.len() < 1 {
 			return;
 		}
 
-		play_sound(args[0], &mut connection, &server_id);
+		play_sound(args[0], &mut context.connection, &context.server_id);
 	};
 
-	let voice_join_callback = |mut connection: &mut Connection, server_id: &ServerId, args: &[&str]| {
+	let voice_join_callback = |context: &mut Context, args: &[&str]| {
 		if args.len() < 1 {
 			return;
 		}
 
-		// TODO: Inject voice_channel_id via Context or something like that
-		let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number"));
-		let voice_handle = connection.voice(Some(*server_id));
+		let voice_handle = context.connection.voice(Some(context.server_id));
 
 		if args[0] == "join" {
+			let voice_channel_id = context.voice_channel_id;
 			voice_handle.connect(voice_channel_id);
 		} else if args[0] == "leave" {
 			voice_handle.disconnect();
@@ -200,7 +199,8 @@ fn main() {
 					let mut has_invoked_cmd = false;
 					for command in &commands {
 						if command.matches(command_name) {
-							command.invoke(&mut connection, &server_id, &user_id, parameters);
+							let mut context = Context::new(&mut connection, server_id, voice_channel_id, user_id);
+							command.invoke(&mut context, parameters);
 							has_invoked_cmd = true;
 						}
 					}
