@@ -8,3 +8,5 @@ discord = { git = "https://github.com/SpaceManiac/discord-rs.git" }
 hound = "2.0.0"
 chrono = "0.2"
 rand = "0.3.14"
+log = "*"
+log4rs = "0.5.0"
