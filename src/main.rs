@@ -3,6 +3,10 @@ extern crate hound;
 extern crate chrono;
 extern crate rand;
 
+#[macro_use]
+extern crate log;
+extern crate log4rs;
+
 use discord::{Discord, Connection, State};
 use discord::model::{Event, ChannelId, ServerId, UserId};
 use discord::voice::{AudioSource};
@@ -49,7 +53,7 @@ fn say_goodbye(discord: &Discord, user_id: &UserId, status_channel_id: &ChannelI
 
 fn play_sound(command: &str, connection: &mut Connection, server_id: &ServerId) {
 	if let Ok(mut reader) = hound::WavReader::open(command.to_string() + ".wav") {
-		println!("Playing file {}.", command.to_string() + ".wav");
+		info!("Playing file {}.", command.to_string() + ".wav");
 
 		let samples: Vec<i16> = reader.samples().map(|s| s.unwrap()).collect();
 		let source = create_pcm_source(true, samples);
@@ -57,7 +61,7 @@ fn play_sound(command: &str, connection: &mut Connection, server_id: &ServerId) 
 		let voice_handle = connection.voice(Some(*server_id));
 		voice_handle.play(source);
 	} else {
-		println!("Trying to play invalid sound: {}", command);
+		warn!("Trying to play invalid sound: {}", command);
 	}
 }
 
@@ -101,6 +105,8 @@ fn sync_voice_user_state(has_synced: &mut bool, voice_users: &mut HashSet<UserId
 }
 
 fn main() {
+	log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
+
 	let mut voice_users: HashSet<UserId> = HashSet::new();
 
 	// Log in to Discord using a bot token from the environment
@@ -109,7 +115,7 @@ fn main() {
 	// Establish and use a websocket connection
 	let (mut connection, ready) = discord.connect().expect("connect failed");
 	let mut state = State::new(ready);
-	println!("Ready.");
+	info!("Ready.");
 
 	let server_id = ServerId(u64::from_str(&env::var("FSB_SERVER_ID").expect("Cannot find server id")).expect("Id is not a number"));
 	let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number"));
@@ -156,15 +162,16 @@ fn main() {
 		let event = match connection.recv_event() {
 			Ok(event) => event,
 			Err(err) => {
-				println!("[Warning] Receive error: {:?}", err);
+				warn!("[Warning] Receive error: {:?}", err);
 				if let discord::Error::WebSocket(..) = err {
 					// Handle the websocket connection being dropped
 					let (new_connection, ready) = discord.connect().expect("connect failed");
 					connection = new_connection;
 					state = State::new(ready);
-					println!("[Ready] Reconnected successfully.");
+					info!("[Ready] Reconnected successfully.");
 				}
-				if let discord::Error::Closed(..) = err {
+				if let discord::Error::Closed(code, message) = err {
+					error!("Quitting because of error (Code: {:?}): {}", code, message);
 					break
 				}
 
@@ -182,7 +189,7 @@ fn main() {
 
 		match event {
 			Event::MessageCreate(message) => {
-				println!("{} says: {}", message.author.name, message.content);
+				info!("{} says: {}", message.author.name, message.content);
 				let user_id = message.author.id;
 
 				if message.content.starts_with("!") && message.content.len() > 1 {
@@ -206,7 +213,7 @@ fn main() {
 					}
 
 					if !has_invoked_cmd {
-						println!("[Info] Unknown command: {}", command_name);
+						info!("Unknown command: {}", command_name);
 					}
 				}
 
@@ -214,7 +221,7 @@ fn main() {
 					let _ = discord.send_message(&message.channel_id, "You can find my internals at https://github.com/TorstenCScholz/fs-bot", "", false);
 				} else if message.content == "!quit" {
 					if master_permission_id == user_id {
-						println!("Quitting.");
+						info!("Quitting.");
 						let text = "Bye ".to_string() + &message.author.name + ".";
 						let _ = discord.send_message(&message.channel_id, &text, "", false);
 						break;
@@ -222,7 +229,7 @@ fn main() {
 				}
 			}
 			Event::VoiceStateUpdate(server_id, voice_state) => {
-				println!("[Voice update] {:?}", voice_state);
+				info!("[Voice update] {:?}", voice_state);
 
 				let user_id = voice_state.user_id;
 
@@ -258,11 +265,13 @@ fn main() {
 					}
 				}
 
-				println!("[Users after voice update] {:?}", voice_users);
+				info!("[Users after voice update] {:?}", voice_users);
 			}
 			_ => {}
 		}
 	}
+
+	info!("Quitting the bot.");
 
 	// Log out from the API
 	connection.shutdown().expect("closing websocket failed");
