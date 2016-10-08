@@ -1,5 +1,5 @@
 use discord::{Connection};
-use discord::model::{ServerId, UserId};
+use discord::model::{ServerId, UserId, ChannelId};
 
 use std::cmp::{PartialEq, Eq};
 use std::hash::{Hash, Hasher};
@@ -60,14 +60,16 @@ impl <'a> Hash for Command<'a> {
 pub struct Context<'a> {
     pub connection: &'a mut Connection,
     pub server_id: ServerId,
-    pub user_id: UserId
+    pub voice_channel_id: ChannelId,
+    pub user_id: UserId,
 }
 
 impl <'a> Context<'a> {
-    pub fn new(connection: &'a mut Connection, server_id: ServerId, user_id: UserId) -> Context<'a> {
+    pub fn new(connection: &'a mut Connection, server_id: ServerId, voice_channel_id: ChannelId, user_id: UserId) -> Context<'a> {
         Context {
             connection: connection,
             server_id: server_id,
+            voice_channel_id: voice_channel_id,
             user_id: user_id
         }
     }

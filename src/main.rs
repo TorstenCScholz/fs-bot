@@ -136,11 +136,10 @@ fn main() {
 			return;
 		}
 
-		// TODO: Inject voice_channel_id via Context or something like that
-		let voice_channel_id = ChannelId(u64::from_str(&env::var("FSB_VOICE_CHANNEL_ID").expect("Cannot find voice channel id")).expect("Id is not a number"));
 		let voice_handle = context.connection.voice(Some(context.server_id));
 
 		if args[0] == "join" {
+			let voice_channel_id = context.voice_channel_id;
 			voice_handle.connect(voice_channel_id);
 		} else if args[0] == "leave" {
 			voice_handle.disconnect();
@@ -199,7 +198,7 @@ fn main() {
 					let mut has_invoked_cmd = false;
 					for command in &commands {
 						if command.matches(command_name) {
-							let mut context = Context::new(&mut connection, server_id, user_id);
+							let mut context = Context::new(&mut connection, server_id, voice_channel_id, user_id);
 							command.invoke(&mut context, parameters);
 							has_invoked_cmd = true;
 						}
