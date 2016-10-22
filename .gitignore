@@ -2,3 +2,6 @@ target
 vars
 *.wav
 /log
+/.idea
+fs-bot.iml
+*.sqlite

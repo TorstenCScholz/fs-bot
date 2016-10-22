@@ -27,6 +27,8 @@ mod command;
 
 use command::{Command, Context};
 
+const DATABASE_NAME: &'static str = "database.sqlite";
+
 fn send_to_channel(discord: &Discord, server_id: &ServerId, channel_id: &ChannelId, user_id: &UserId, message_postfix: &str) {
 	let now = Local::now();
 
@@ -108,18 +110,135 @@ fn sync_voice_user_state(has_synced: &mut bool, voice_users: &mut HashSet<UserId
 	}
 }
 
+fn is_database_available(db_name: &str) -> bool {
+    std::fs::metadata(db_name).is_ok()
+}
+
+fn create_database(db_name: &str) -> rusqlite::Connection {
+    let sql_conn = rusqlite::Connection::open(db_name).expect(&format!("Could not establish connection to {}", db_name));
+
+    sql_conn.execute("CREATE TABLE users (
+						  id INTEGER PRIMARY KEY AUTOINCREMENT,
+						  discord_user_id VARCHAR NOT NULL,
+						  discord_user_name VARCHAR NOT NULL,
+						  voice_last_seen INTEGER,
+						  online_last_seen INTEGER
+						)", &[]).expect("Cannot create table 'users'.");
+
+    info!("Successfully created table 'users'.");
+
+    return sql_conn;
+}
+
+#[derive(Debug)]
+struct User {
+    pub id: Option<i64>,
+    pub discord_user_id: UserId,
+    pub discord_user_name: String,
+    pub voice_last_seen: i64,
+    pub online_last_seen: i64
+}
+
+impl User {
+    pub fn new(discord_user_id: UserId, discord_user_name: String, voice_last_seen: i64, online_last_seen: i64) -> User {
+        User::new_with_id(None, discord_user_id, discord_user_name, voice_last_seen, online_last_seen)
+    }
+
+    pub fn new_with_id(id: Option<i64>, discord_user_id: UserId, discord_user_name: String, voice_last_seen: i64, online_last_seen: i64) -> User {
+        User {
+            id: id,
+            discord_user_id: discord_user_id,
+            discord_user_name: discord_user_name,
+            voice_last_seen: voice_last_seen,
+            online_last_seen: online_last_seen
+        }
+    }
+}
+
+fn insert_user(sql_conn: &rusqlite::Connection, user: &User) -> User {
+    let mut prepared = sql_conn.prepare("INSERT INTO users (discord_user_id, discord_user_name, voice_last_seen, online_last_seen) VALUES ($1, $2, $3, $4)").expect("Could not prepare INSERT statement.");
+
+    let id = prepared.insert(&[&user.discord_user_id.to_string(), &user.discord_user_name, &user.voice_last_seen.to_string(), &user.online_last_seen.to_string()]).expect("Could not INSERT user: {:?}.");
+
+    info!("row id is {}", id);
+
+    User::new_with_id(
+        Some(id),
+        user.discord_user_id,
+        user.discord_user_name.clone(),
+        user.voice_last_seen,
+        user.online_last_seen
+    )
+}
+
+fn find_one_user_by_id(sql_conn: &rusqlite::Connection, id: i64) -> Option<User> {
+    let mut prepared = sql_conn.prepare("SELECT * FROM users WHERE id = $1").expect("Could not prepare SELECT statement.");
+
+    if prepared.exists(&[&id.to_string()]).is_ok() {
+        let mut user_rows = prepared.query(&[&id]).expect("Could not SELECT from users.");
+
+        if let Some(result_row) = user_rows.next() {
+            let row = result_row.unwrap();
+
+            return Some(User::new_with_id(
+                Some(row.get("id")),
+                UserId(row.get::<&str, String>("discord_user_id").parse::<u64>().unwrap()),
+                row.get("discord_user_name"),
+                row.get("voice_last_seen"),
+                row.get("online_last_seen"),
+            ))
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn find_one_user_by_name(sql_conn: &rusqlite::Connection, discord_user_name: &str) -> Option<User> {
+    let mut prepared = sql_conn.prepare("SELECT * FROM users WHERE discord_user_name = $1").expect("Could not prepare SELECT statement.");
+
+    if prepared.exists(&[&discord_user_name.to_string()]).is_ok() {
+        let to_user = |row: &rusqlite::Row| Some(
+            User::new_with_id(
+                Some(row.get("id")),
+                UserId(row.get::<&str, String>("discord_user_id").parse::<u64>().unwrap()),
+                row.get("discord_user_name"),
+                row.get("voice_last_seen"),
+                row.get("online_last_seen"),
+            )
+        );
+
+        let users = prepared.query_map(&[&discord_user_name], to_user).expect("Could not SELECT from users.");
+        // TODO: Just make a collection out of it and pick the first one
+        // (I want to know how to do that despite the fact that the current impl. is prob. better)
+        for user in users {
+            if user.is_ok() {
+                return user.unwrap();
+            }
+        }
+
+        None
+    } else {
+        None
+    }
+}
+
 fn main() {
 	log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
 
-	let sql_conn = rusqlite::Connection::open("database.sqlite").unwrap();
+	let sql_conn: rusqlite::Connection;
 
-	println!("{:?}", sql_conn.execute("CREATE TABLE users (
-						  id INTEGER PRIMARY KEY AUTOINCREMENT,
-						  discord_user_id VARCHAR NOT NULL,
-						  discord_name VARCHAR NOT NULL,
-						  voice_last_seen INTEGER,
-						  online_last_seen INTEGER
-						)", &[]));
+    if !is_database_available(DATABASE_NAME) {
+        sql_conn = create_database(DATABASE_NAME);
+    } else {
+        sql_conn = rusqlite::Connection::open(DATABASE_NAME).expect(&format!("Could not establish connection to {}", DATABASE_NAME));
+    }
+
+//    let temp_user = User::new(UserId(2353), "peter".to_string(), 123, 45);
+    let temp_user = User::new(UserId(46545654), "valdi".to_string(), 555, 999);
+    let user = insert_user(&sql_conn, &temp_user);
+    info!("User exists? {:?}", find_one_user_by_name(&sql_conn, &user.discord_user_name));
 
 	// let mut voice_users: HashSet<UserId> = HashSet::new();
 	//
