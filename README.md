@@ -19,5 +19,6 @@ The environment variables names are
 * FSB_VOICE_CHANNEL_ID
 * FSB_STATUS_CHANNEL_ID
 * FSB_MY_ID
+* FSB_MASTER_PERMISSION_ID
 
 You can find the ids in Discord when you enable Developer mode and then right clicking everything of interest.

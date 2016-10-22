@@ -10,3 +10,7 @@ chrono = "0.2"
 rand = "0.3.14"
 log = "*"
 log4rs = "0.5.0"
+rusqlite = "0.7.3"
+# diesel = { version = "0.8.0", features = ["sqlite"], default-features = false }
+# diesel_codegen = { version = "0.8.0", features = ["sqlite"] }
+dotenv = "0.8.0"
